@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MINEMATH</title>
+  <style>
+    body {
+      background-image: url('https://bing.com/th/id/BCO.deb06032-3c2b-435b-8904-93c627043ac6.png');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh; /* Ensure full height coverage */
+      box-sizing: border-box; /* Include padding in height calculation */
+    }
+    #game {
+      max-width: 400px;
+      margin: auto;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .scoreboard {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    #answers button {
+      margin: 5px;
+      padding: 10px 20px;
+    }
+    .message-area {
+      font-size: 18px;
+      margin-top: 15px;
+    }
+    .message-area.correct {
+      color: green;
+    }
+    .message-area.error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <h2>Save the Chicken Jockey!</h2>
+    <div class="scoreboard">💎 <span id="diamonds">0</span> &nbsp; ❤️ <span id="hearts">3</span></div>
+    <div id="question">Question will appear here...</div>
+    <div id="answers"></div>
+    <div id="message" class="message-area"></div>
+    <button id="restart-btn" style="display:none;">Restart</button>
+  </div>
+
+  <audio id="wrongAnswerSound" src="Villager_trade1.oga" preload="auto"></audio>
+  <audio id="winSound" src="minecraft-rare-achievement.mp3" preload="auto"></audio>
+
+  <script>
+        // Game Variables
+        let diamonds = 0;
+        let hearts = 3;
+        let currentQuestionIndex = 0;
+        let questions = [];
+
+        // DOM Elements
+        const diamondsElement = document.getElementById('diamonds');
+        const heartsElement = document.getElementById('hearts');
+        const questionElement = document.getElementById('question');
+        const answersElement = document.getElementById('answers');
+        const messageElement = document.getElementById('message');
+        const restartBtn = document.getElementById('restart-btn');
+
+        // --- Question Generation (Grade 1-2: Addition/Subtraction within 20) ---
+        function generateQuestions() {
+            const generatedQuestions = [];
+            const operations = ['+', '-'];
+            const numQuestions = 20; // Generate 20 questions
+
+            for (let i = 0; i < numQuestions; i++) {
+                const operation = operations[Math.floor(Math.random() * operations.length)];
+                let num1, num2, correctAnswer;
+
+                if (operation === '+') {
+                    num1 = Math.floor(Math.random() * 11); // 0-10
+                    num2 = Math.floor(Math.random() * (21 - num1)); // Ensure sum <= 20
+                    correctAnswer = num1 + num2;
+                } else { // Subtraction
+                    num1 = Math.floor(Math.random() * 21); // 0-20
+                    num2 = Math.floor(Math.random() * (num1 + 1)); // Ensure num2 <= num1
+                    correctAnswer = num1 - num2;
+                }
+
+                const questionText = `${num1} ${operation} ${num2} = ?`;
+                const options = generateOptions(correctAnswer);
+                const correctIndex = options.indexOf(correctAnswer);
+
+                generatedQuestions.push({
+                    question: questionText,
+                    options: options,
+                    correctIndex: correctIndex
+                });
+            }
+            // Shuffle questions for variety each time
+            return generatedQuestions.sort(() => Math.random() - 0.5);
+        }
+
+        function generateOptions(correctAnswer) {
+            const options = new Set();
+            options.add(correctAnswer);
+
+            while (options.size < 3) {
+                let wrongAnswer;
+                // Generate plausible wrong answers near the correct one
+                const offset = Math.floor(Math.random() * 5) - 2; // -2 to +2
+                wrongAnswer = correctAnswer + offset;
+                // Ensure wrong answer is non-negative and different from correct answer
+                if (wrongAnswer >= 0 && wrongAnswer !== correctAnswer) {
+                    options.add(wrongAnswer);
+                }
+                // Add a completely random non-negative option if needed
+                if (options.size < 3 && Math.random() < 0.3) {
+                     let randomWrong = Math.floor(Math.random() * 21);
+                     if (randomWrong !== correctAnswer) options.add(randomWrong);
+                }
+            }
+            // Convert Set to array and shuffle
+            return Array.from(options).sort(() => Math.random() - 0.5);
+        }
+
+        // --- Game Logic ---
+        function startGame() {
+            diamonds = 0;
+            hearts = 3;
+            currentQuestionIndex = 0;
+            questions = generateQuestions();
+            messageElement.textContent = '';
+            messageElement.className = 'message-area'; // Reset message style
+            restartBtn.style.display = 'none';
+            answersElement.style.display = 'block'; // Show answers
+            updateScoreboard(); // Call the adjusted function
+            displayQuestion();
+        }
+
+        // Adjusted updateScoreboard function for the new template
+        function updateScoreboard() {
+            diamondsElement.textContent = diamonds; // Update number in span id="diamonds"
+            heartsElement.textContent = hearts;   // Update number in span id="hearts"
+        }
+
+        function displayQuestion() {
+            if (currentQuestionIndex >= questions.length) {
+                endGame(diamonds >= 10);
+                return;
+            }
+
+            const q = questions[currentQuestionIndex];
+            questionElement.textContent = q.question;
+            answersElement.innerHTML = ''; // Clear previous buttons
+
+            q.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.addEventListener('click', () => checkAnswer(index));
+                answersElement.appendChild(button);
+            });
+        }
+
+        function checkAnswer(selectedIndex) {
+            const q = questions[currentQuestionIndex];
+            const buttons = answersElement.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (selectedIndex === q.correctIndex) {
+                diamonds++;
+                messageElement.textContent = 'Correct! +1 💎';
+                messageElement.className = 'message-area correct'; // Use provided class
+            } else {
+                hearts--;
+                messageElement.textContent = `Wrong! The answer was ${q.options[q.correctIndex]}. -1 ❤️`;
+                messageElement.className = 'message-area error'; // Use provided class
+                // Play wrong answer sound
+                const wrongSound = document.getElementById('wrongAnswerSound');
+                if (wrongSound) {
+                    wrongSound.currentTime = 0; // Rewind to start in case it's still playing
+                    wrongSound.play();
+                }
+            }
+
+            updateScoreboard(); // Call the adjusted function
+
+            if (diamonds >= 10) {
+                endGame(true);
+            } else if (hearts <= 0) {
+                endGame(false);
+            } else {
+                currentQuestionIndex++;
+                setTimeout(() => {
+                    messageElement.textContent = '';
+                    messageElement.className = 'message-area';
+                    displayQuestion();
+                }, 1500);
+            }
+        }
+
+        function endGame(isWin) {
+            answersElement.style.display = 'none';
+            questionElement.textContent = '';
+            if (isWin) {
+                messageElement.innerHTML = '🎉 You saved the Chicken Jockey!<br><img src="https://bing.com/th/id/BCO.714453d7-075d-48ae-ae2b-f93ddf44b033.png" width="150">';
+                messageElement.className = 'message-area correct';
+                // Play win sound
+                const winSound = document.getElementById('winSound');
+                if (winSound) {
+                    winSound.currentTime = 0; // Rewind to start
+                    winSound.play();
+                }
+            } else {
+                messageElement.textContent = '💀 Game Over – Try Again!';
+                messageElement.className = 'message-area error';
+            }
+            restartBtn.style.display = 'inline-block';
+        }
+
+        // --- Event Listeners ---
+        restartBtn.addEventListener('click', startGame);
+
+        // --- Initial Game Start ---
+        document.addEventListener('DOMContentLoaded', startGame);
+  </script>
+</body>
+</html>
